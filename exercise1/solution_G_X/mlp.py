@@ -73,7 +73,9 @@ class SquareLoss(object):
         """
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
         if len(y_true.shape) == 0 or len(y_pred.shape) == 0:
+            #print(1 if np.ravel([y_true]) == np.ravel([y_pred]) else 0, np.ravel([y_true]), np.ravel([y_pred]))
             return 1 if np.ravel([y_true]) == np.ravel([y_pred]) else 0
+        #print((y_true.shape[0] - np.count_nonzero(y_true - y_pred)) / y_true.shape[0])
         return (y_true.shape[0] - np.count_nonzero(y_true - y_pred)) / y_true.shape[0]
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
@@ -266,26 +268,26 @@ class MultiLayerPerceptron:
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
         # 1. Calculate error and derivatives for the output layer (Layer 3)
-        output_error = self.loss.delta(gt, pred)
-        output_delta = output_error * self.derivative_function(self.fc2_w_acti)
+        output_delta = np.array(self.loss.delta(gt, pred)) @ np.array(self.derivative_function(self.net3))
+        output_adjustment = np.outer(self.fc2_w_acti, np.array(output_delta))
 
         # 2. Calculate error and derivatives for the hidden layer 2 (Layer 2)
-        hidden2_error = np.dot(output_delta, self.output_weight)
-        hidden2_delta = hidden2_error * self.derivative_function(self.fc1_w_acti)
+        hidden2_delta =  self.derivative_function(self.net2) * np.squeeze(output_delta * self.output_weight)
+        hidden2_adjustment = np.outer(self.fc1_w_acti, hidden2_delta)
 
         # 3. Calculate error and derivatives for the hidden layer 1 (Layer 1)
-        hidden1_error = np.dot(hidden2_delta, self.hidden_weight2)
-        hidden1_delta = hidden1_error * self.derivative_function(input)
+        hidden1_delta = np.dot(hidden2_delta, self.hidden_weight2.T) * self.derivative_function(self.net1)
+        hidden1_adjustment = np.outer(input, hidden1_delta)
 
         # 4. Update weights for each layer
-        self.output_weight -= self.lr * np.dot(self.fc2_w_acti.T, output_delta)
-        self.hidden_weight2 -= self.lr * np.dot(self.fc1_w_acti.T, hidden2_delta)
-        self.hidden_weight -= self.lr * np.dot(input.T, hidden1_delta)
+        self.output_weight -= self.lr * output_adjustment
+        self.hidden_weight2 -= self.lr * hidden2_adjustment
+        self.hidden_weight -= self.lr * hidden1_adjustment
 
         # 5. Update biases for each layer
-        self.output_bias -= self.lr * np.sum(output_delta, axis=0, keepdims=True)
-        self.hidden_bias2 -= self.lr * np.sum(hidden2_delta, axis=0, keepdims=True)
-        self.hidden_bias -= self.lr * np.sum(hidden1_delta, axis=0, keepdims=True)
+        self.output_bias -= self.lr * np.sum(output_adjustment, axis=0, keepdims=False)
+        self.hidden_bias2 -= self.lr * np.sum(hidden2_adjustment, axis=0, keepdims=False)
+        self.hidden_bias -= self.lr * np.sum(hidden1_adjustment, axis=0, keepdims=False)
 
         '''
         # 4. Update weights for each layer
@@ -311,13 +313,41 @@ class MultiLayerPerceptron:
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
         # 1. Pass through hidden fully-connected layer 1
-        self.fc1_w_acti = self.activation_function((inputs @ self.hidden_weight) + self.hidden_bias)  # to be corrected by you
+        self.net1 = (inputs @ self.hidden_weight) + self.hidden_bias  # to be corrected by you
+        self.fc1_w_acti = self.activation_function(self.net1)
 
         # 2. Pass through hidden fully-connected layer 2
-        self.fc2_w_acti = self.activation_function((self.fc1_w_acti @ self.hidden_weight2) + self.hidden_bias2) # to be corrected by you
+        self.net2 = (self.fc1_w_acti @ self.hidden_weight2) + self.hidden_bias2 # to be corrected by you
+        self.fc2_w_acti =  self.activation_function(self.net2)
 
         # 3. Pass through output fully-connected layer
-        self.fc3_w_acti = np.where(self.activation_function((self.fc2_w_acti @ self.output_weight) + self.output_bias) < self.threshold, -1, 1)  # to be corrected by you
+        self.net3 = (self.fc2_w_acti @ self.output_weight) + self.output_bias
+        self.fc3_w_acti = np.where(self.activation_function(self.net3) < self.threshold, 0, 1)  # to be corrected by you
+
+        '''
+        print("==============INPUTS==============")
+        print(inputs)
+        print("==============WEIGHTS1==============")
+        print(self.hidden_weight)
+        print("==============NET1==============")
+        print(self.net1)
+        print("==============ACT1==============")
+        print(self.fc1_w_acti)
+        print("==============WEIGHTS2==============")
+        print(self.hidden_weight2)
+        print("==============NET2==============")
+        print(self.net2)
+        print("==============ACT2==============")
+        print(self.fc2_w_acti)
+        print("==============WEIGHTS3==============")
+        print(self.output_weight)
+        print("==============NET3==============")
+        print(self.net3)
+        print("==============ACT3============== (NOT USED)")
+        print(self.activation_function(self.net3))
+        print("==============ACT3_THRESH============== (USED)")
+        print(self.fc3_w_acti)'''
+
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
         return self.fc3_w_acti
