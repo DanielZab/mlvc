@@ -285,9 +285,15 @@ class MultiLayerPerceptron:
         self.hidden_weight -= self.lr * hidden1_adjustment
 
         # 5. Update biases for each layer
+        self.output_bias -= self.lr * output_adjustment[0, :]
+        self.hidden_bias2 -= self.lr * hidden2_adjustment[0, :]
+        self.hidden_bias -= self.lr * hidden1_adjustment[0, :]
+
+        '''
+                # 5. Update biases for each layer
         self.output_bias -= self.lr * np.sum(output_adjustment, axis=0, keepdims=False)
         self.hidden_bias2 -= self.lr * np.sum(hidden2_adjustment, axis=0, keepdims=False)
-        self.hidden_bias -= self.lr * np.sum(hidden1_adjustment, axis=0, keepdims=False)
+        self.hidden_bias -= self.lr * np.sum(hidden1_adjustment, axis=0, keepdims=False)'''
 
         '''
         # 4. Update weights for each layer
