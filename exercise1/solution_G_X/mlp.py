@@ -39,7 +39,7 @@ class SquareLoss(object):
         y_true = y_true if self.activation == "sigmoid" else np.where(y_true > 0, 1, -1)
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-        return np.linalg.norm(y_true - y_pred) ** 2
+        return np.linalg.norm(y_pred - y_true) ** 2
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
     def delta(self, y_true, y_pred):
@@ -57,7 +57,7 @@ class SquareLoss(object):
         y_true = y_true if self.activation == "sigmoid" else np.where(y_true > 0, 1, -1)
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-        return 2 * (y_pred - y_true)
+        return (y_pred - y_true)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
     def calculate_accuracy(self, y_true, y_pred):
@@ -267,17 +267,20 @@ class MultiLayerPerceptron:
         """
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
+        def convert(x):
+            size = x.shape[0] if len(x.shape) >= 1 else 1
+            return x.reshape(1, size)
         # 1. Calculate error and derivatives for the output layer (Layer 3)
-        output_delta = np.array(self.loss.delta(gt, pred)) @ np.array(self.derivative_function(self.net3))
-        output_adjustment = np.outer(self.fc2_w_acti, np.array(output_delta))
+        output_delta = np.array(self.loss.delta(gt, pred)) @ np.array(self.derivative_function(self.my_fc3_w_acti))
+        output_adjustment = np.dot(convert(self.fc2_w_acti).T, convert(output_delta))
 
         # 2. Calculate error and derivatives for the hidden layer 2 (Layer 2)
-        hidden2_delta =  self.derivative_function(self.net2) * np.squeeze(output_delta * self.output_weight)
-        hidden2_adjustment = np.outer(self.fc1_w_acti, hidden2_delta)
+        hidden2_delta =  self.derivative_function(self.fc2_w_acti) * np.squeeze(output_delta * self.output_weight)
+        hidden2_adjustment = np.dot(convert(self.fc1_w_acti).T, convert(hidden2_delta))
 
         # 3. Calculate error and derivatives for the hidden layer 1 (Layer 1)
-        hidden1_delta = np.dot(hidden2_delta, self.hidden_weight2.T) * self.derivative_function(self.net1)
-        hidden1_adjustment = np.outer(input, hidden1_delta)
+        hidden1_delta = np.dot(hidden2_delta, self.hidden_weight2.T) * self.derivative_function(self.fc1_w_acti)
+        hidden1_adjustment = np.dot(convert(input).T, convert(hidden1_delta))
 
         # 4. Update weights for each layer
         self.output_weight -= self.lr * output_adjustment
@@ -324,11 +327,12 @@ class MultiLayerPerceptron:
 
         # 2. Pass through hidden fully-connected layer 2
         self.net2 = (self.fc1_w_acti @ self.hidden_weight2) + self.hidden_bias2 # to be corrected by you
-        self.fc2_w_acti =  self.activation_function(self.net2)
+        self.fc2_w_acti = self.activation_function(self.net2)
 
         # 3. Pass through output fully-connected layer
         self.net3 = (self.fc2_w_acti @ self.output_weight) + self.output_bias
-        self.fc3_w_acti = np.where(self.activation_function(self.net3) < self.threshold, 0, 1)  # to be corrected by you
+        self.my_fc3_w_acti = self.activation_function(self.net3)
+        self.fc3_w_acti = np.where(self.my_fc3_w_acti < self.threshold, 0, 1)  # to be corrected by you
 
         '''
         print("==============INPUTS==============")
