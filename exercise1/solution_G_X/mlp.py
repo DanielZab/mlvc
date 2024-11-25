@@ -271,17 +271,18 @@ class MultiLayerPerceptron:
             size = x.shape[0] if len(x.shape) >= 1 else 1
             return x.reshape(1, size)
         # 1. Calculate error and derivatives for the output layer (Layer 3)
-        output_delta = np.array(self.loss.delta(gt, pred)) @ np.array(self.derivative_function(self.my_fc3_w_acti))
+        #output_delta = np.array(self.loss.delta(gt, pred)) @ np.array(self.derivative_function(self.my_fc3_w_acti))
+        output_delta = np.dot(self.loss.delta(gt, pred ), self.derivative_function(self.net3))
         output_adjustment = np.outer(self.fc2_w_acti, output_delta)
 
         assert (np.dot(convert(self.fc2_w_acti).T, convert(output_delta)) == np.outer(self.fc2_w_acti, output_delta)).all()
 
         # 2. Calculate error and derivatives for the hidden layer 2 (Layer 2)
-        hidden2_delta =  self.derivative_function(self.fc2_w_acti) * np.squeeze(output_delta * self.output_weight)
+        hidden2_delta =  self.derivative_function(self.net2) * output_delta * self.output_weight.T
         hidden2_adjustment = np.outer(self.fc1_w_acti, hidden2_delta)
 
         # 3. Calculate error and derivatives for the hidden layer 1 (Layer 1)
-        hidden1_delta = np.dot(hidden2_delta, self.hidden_weight2.T) * self.derivative_function(self.fc1_w_acti)
+        hidden1_delta = np.dot(hidden2_delta.flatten(), self.hidden_weight2.T) * self.derivative_function(self.net1)
         hidden1_adjustment = np.outer(input, hidden1_delta)
 
         # 4. Update weights for each layer
