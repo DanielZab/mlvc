@@ -95,10 +95,10 @@ class SVM:
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
         Q = cvxopt.matrix(np.outer(y, y) * K)
-        p = cvxopt.matrix(-np.ones((n_observations, 1)))
-        G = cvxopt.matrix(np.vstack((-np.eye(n_observations), np.eye(n_observations))))
-        h = cvxopt.matrix(np.hstack((np.zeros(n_observations), np.ones(n_observations) * 1)))
-        A = cvxopt.matrix(y, (1, n_observations))
+        p = cvxopt.matrix(-np.ones(n_observations))
+        G = cvxopt.matrix(-np.eye(n_observations))
+        h = cvxopt.matrix(np.zeros(n_observations))
+        A = cvxopt.matrix(y)
         b = cvxopt.matrix(0.0)
         # SEE: https://cvxopt.org/examples/tutorial/qp.html and https://cvxopt.org/userguide/coneprog.html#quadratic-programming and http://www.seas.ucla.edu/~vandenbe/publications/mlbook.pdf
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
@@ -108,13 +108,8 @@ class SVM:
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
         self.__alphas = np.ravel(solution['x'])
-        #support_vector_indices = self.__alphas >= 0
-        #self.__support_vectors = X
         self.__support_vector_labels = y[0]
-        #self.__alphas = self.__alphas[support_vector_indices]
-
-        # Compute the bias term
-        self.__bias = np.mean(self.__support_vector_labels - np.dot(K*K, self.__alphas * self.__support_vector_labels))
+        self.__bias = np.mean(self.__support_vector_labels - np.dot(K, self.__alphas * self.__support_vector_labels))
 
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 

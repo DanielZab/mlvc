@@ -39,7 +39,7 @@ class SquareLoss(object):
         y_true = y_true if self.activation == "sigmoid" else np.where(y_true > 0, 1, -1)
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-        return np.linalg.norm(y_pred - y_true) ** 2
+        return (y_pred - y_true) ** 2
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
     def delta(self, y_true, y_pred):
@@ -57,7 +57,7 @@ class SquareLoss(object):
         y_true = y_true if self.activation == "sigmoid" else np.where(y_true > 0, 1, -1)
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-        return (y_pred - y_true)
+        return 2 * (y_pred - y_true)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
     def calculate_accuracy(self, y_true, y_pred):
@@ -273,6 +273,8 @@ class MultiLayerPerceptron:
         # 1. Calculate error and derivatives for the output layer (Layer 3)
         output_delta = np.array(self.loss.delta(gt, pred)) @ np.array(self.derivative_function(self.my_fc3_w_acti))
         output_adjustment = np.dot(convert(self.fc2_w_acti).T, convert(output_delta))
+
+        assert np.dot(convert(self.fc2_w_acti).T, convert(output_delta)) == np.outer(self.fc2_w_acti, output_delta)
 
         # 2. Calculate error and derivatives for the hidden layer 2 (Layer 2)
         hidden2_delta =  self.derivative_function(self.fc2_w_acti) * np.squeeze(output_delta * self.output_weight)
