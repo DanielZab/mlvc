@@ -72,11 +72,9 @@ class SquareLoss(object):
             float: Accuracy value.
         """
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-        if len(y_true.shape) == 0 or len(y_pred.shape) == 0:
-            #print(1 if np.ravel([y_true]) == np.ravel([y_pred]) else 0, np.ravel([y_true]), np.ravel([y_pred]))
-            return 1 if np.ravel([y_true]) == np.ravel([y_pred]) else 0
-        #print((y_true.shape[0] - np.count_nonzero(y_true - y_pred)) / y_true.shape[0])
-        return (y_true.shape[0] - np.count_nonzero(y_true - y_pred)) / y_true.shape[0]
+        pred_labels = (y_pred >= self.threshold).astype(int)
+        true_labels = (y_true >= self.threshold).astype(int)
+        return np.mean(pred_labels == true_labels)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
 
@@ -267,18 +265,13 @@ class MultiLayerPerceptron:
         """
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-        def convert(x):
-            size = x.shape[0] if len(x.shape) >= 1 else 1
-            return x.reshape(1, size)
         # 1. Calculate error and derivatives for the output layer (Layer 3)
-        #output_delta = np.array(self.loss.delta(gt, pred)) @ np.array(self.derivative_function(self.my_fc3_w_acti))
-        output_delta = np.dot(self.loss.delta(gt, pred ), self.derivative_function(self.net3))
+        output_delta = self.loss.delta(gt, pred)
         output_adjustment = np.outer(self.fc2_w_acti, output_delta)
 
-        assert (np.dot(convert(self.fc2_w_acti).T, convert(output_delta)) == np.outer(self.fc2_w_acti, output_delta)).all()
-
         # 2. Calculate error and derivatives for the hidden layer 2 (Layer 2)
-        hidden2_delta =  self.derivative_function(self.net2) * output_delta * self.output_weight.T
+        # Both approaches are working: 
+        hidden2_delta =  self.derivative_function(self.net2) * np.dot(output_delta, self.output_weight.T)
         hidden2_adjustment = np.outer(self.fc1_w_acti, hidden2_delta)
 
         # 3. Calculate error and derivatives for the hidden layer 1 (Layer 1)
@@ -334,8 +327,7 @@ class MultiLayerPerceptron:
 
         # 3. Pass through output fully-connected layer
         self.net3 = (self.fc2_w_acti @ self.output_weight) + self.output_bias
-        self.my_fc3_w_acti = self.activation_function(self.net3)
-        self.fc3_w_acti = np.where(self.my_fc3_w_acti < self.threshold, 0, 1)  # to be corrected by you
+        self.fc3_w_acti = self.net3
 
         '''
         print("==============INPUTS==============")
