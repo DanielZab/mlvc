@@ -43,6 +43,9 @@ class Perceptron:
         numpy.ndarray: Class labels.
         """
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
+
+        # Multiply input with the perceptron weights and add the bias
+        # Negative values are classified as -1, positive values as 1
         return np.where((self.b + self.w @ X) < 0, -1, 1)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
@@ -86,7 +89,12 @@ class Perceptron:
                 prediction_for_update = self.forward(X[n, :])
                 # update the weights of the perceptron at random
                 # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
+
+                # Update the weights based on the learning rate, the error of the prediction and the input vector
+                # For each weight only the corresponding input is relevant
                 self.w = self.w + self.lr * (y[n] - prediction_for_update) * X[n, :]
+
+                # Update the bias based on the learning rate and the error of the prediction
                 self.b = self.b + self.lr * (y[n] - prediction_for_update)
                 # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
@@ -107,5 +115,6 @@ class Perceptron:
         numpy.ndarray: Predicted class labels.
         """
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
+        # Transform the input before forwarding it to the perceptron
         return self.forward(X.T)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
