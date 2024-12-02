@@ -39,7 +39,8 @@ class SquareLoss(object):
         y_true = y_true if self.activation == "sigmoid" else np.where(y_true > 0, 1, -1)
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-        return (y_pred - y_true) ** 2
+        # Square loss L2 loss= (true - predicted value)^2
+        return (y_true - y_pred) ** 2
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
     def delta(self, y_true, y_pred):
@@ -57,6 +58,7 @@ class SquareLoss(object):
         y_true = y_true if self.activation == "sigmoid" else np.where(y_true > 0, 1, -1)
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
+        # Derivative of square loss = 2*(predicted-true value)
         return 2 * (y_pred - y_true)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
@@ -72,8 +74,10 @@ class SquareLoss(object):
             float: Accuracy value.
         """
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
+        # Convert predictions and ground truth to binary labels based on the threshold
         pred_labels = (y_pred >= self.threshold).astype(int)
         true_labels = (y_true >= self.threshold).astype(int)
+        #Compute the percentage of correct labels by averaging over all zeros for wrong and ones for correct labels
         return np.mean(pred_labels == true_labels)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
@@ -81,13 +85,15 @@ class SquareLoss(object):
 # Activation functions and their derivatives
 activation_functions = {
             # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-            "sigmoid": lambda x: 1/(1+np.exp(-x)),
+            # use definition of sigmoid S-shaped curve 1/(1+e^-x) as activation function
+            "sigmoid": lambda x: 1/(1+np.exp(-x)), 
             # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
             "tanh": lambda x: np.tanh(x),
 }
 
 activation_function_threshold = {
             # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
+            # use default threshold of sigmoid 
             "sigmoid": 0.5,
             # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
             "tanh": 0,
@@ -95,7 +101,8 @@ activation_function_threshold = {
 
 activation_derivatives = {
             # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-            "sigmoid": lambda x: (1/(1+np.exp(-x)))*(1 - (1/(1+np.exp(-x)))),
+            # compute dervative of activation function x for sigmoid 
+            "sigmoid": lambda x: x*(1-x),
             # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
             "tanh": lambda x: 1 - x**2,
 }
@@ -266,24 +273,36 @@ class MultiLayerPerceptron:
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
         # 1. Calculate error and derivatives for the output layer (Layer 3)
+        # Use the derivative of the loss function (delta) to compute the difference, 
+        # between the predicted output (pred) and the ground truth labels (gt).
         output_delta = self.loss.delta(gt, pred)
+        # Multiply the output of the second hidden layer by the output layer's error signal
+        # to compute the gradient for the output layer weights.
+        # This represents how much the output weights need to be adjusted.
         output_adjustment = np.outer(self.fc2_w_acti, output_delta)
 
         # 2. Calculate error and derivatives for the hidden layer 2 (Layer 2)
-        # Both approaches are working: 
-        hidden2_delta =  self.derivative_function(self.net2) * np.dot(output_delta, self.output_weight.T)
+        # Backpropagate the error to the second hidden layer
+        # Multiply the output error by the transposed output weights to calculate 
+        # the error contribution from the output layer to the second hidden layer, 
+        # multiply with derivative of activation to account for non-linearity
+        hidden2_delta =  np.dot(output_delta, self.output_weight.T)*self.derivative_function(self.fc2_w_acti)
         hidden2_adjustment = np.outer(self.fc1_w_acti, hidden2_delta)
 
         # 3. Calculate error and derivatives for the hidden layer 1 (Layer 1)
-        hidden1_delta = np.dot(hidden2_delta.flatten(), self.hidden_weight2.T) * self.derivative_function(self.net1)
+        hidden1_delta = np.dot(hidden2_delta, self.hidden_weight2.T) * self.derivative_function(self.fc1_w_acti)
         hidden1_adjustment = np.outer(input, hidden1_delta)
 
         # 4. Update weights for each layer
+        # Subtract the learning rate multiplied by the respective weight adjustments.
+        # This reduces the weights in the direction of the negative gradient to minimize the loss.
         self.output_weight -= self.lr * output_adjustment
         self.hidden_weight2 -= self.lr * hidden2_adjustment
         self.hidden_weight -= self.lr * hidden1_adjustment
 
         # 5. Update biases for each layer
+        # Subtract the learning rate multiplied by the sum of the respective error signals, using the tip from the lecture
+        # This adjusts the biases to account for the aggregated error at each layer.
         self.output_bias -= self.lr * output_adjustment[0, :]
         self.hidden_bias2 -= self.lr * hidden2_adjustment[0, :]
         self.hidden_bias -= self.lr * hidden1_adjustment[0, :]
@@ -318,15 +337,26 @@ class MultiLayerPerceptron:
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
         # 1. Pass through hidden fully-connected layer 1
+        # Compute the input for the first layer as a linear transformation, 
+        # multiplying it with the weights and adding the biases
         self.net1 = (inputs @ self.hidden_weight) + self.hidden_bias  # to be corrected by you
+        # Applying the activation function to the liner combination, 
+        # introducing non-linearity and producing the output of the first hidden layer
         self.fc1_w_acti = self.activation_function(self.net1)
 
         # 2. Pass through hidden fully-connected layer 2
+        # Apply the linear transformation to the output of the first hidden layer 
+        # with weights and biases of the second hidden layer
         self.net2 = (self.fc1_w_acti @ self.hidden_weight2) + self.hidden_bias2 # to be corrected by you
+        # Apply activation function to the linear combination
         self.fc2_w_acti = self.activation_function(self.net2)
 
         # 3. Pass through output fully-connected layer
+        # Apply the linear transformation to the output of the second hidden layer 
+        # with weights and biases of the output layer
         self.net3 = (self.fc2_w_acti @ self.output_weight) + self.output_bias
+        # returning the linear combination directly without applying 
+        # the activation function, since this produces better classification results
         self.fc3_w_acti = self.net3
 
         '''
@@ -427,3 +457,4 @@ class MultiLayerPerceptron:
             self.loss_test_plot.append(np.mean(epoch_loss_test))
             self.acc_train_plot.append(np.mean(epoch_acc_train))
             self.acc_test_plot.append(np.mean(epoch_acc_test))
+
