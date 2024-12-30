@@ -57,7 +57,14 @@ class Attention(nn.Module):
     ):
         super().__init__()
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-        pass
+        self.num_heads = num_heads
+        self.q = nn.Linear(dim, dim, bias=qkv_bias)
+        self.k = nn.Linear(dim, dim, bias=qkv_bias)
+        self.v = nn.Linear(dim, dim, bias=qkv_bias)
+        self.lin = nn.Linear(dim, dim)
+        self.dim = dim // self.num_heads
+        self.scale = qk_scale or 1. / math.sqrt(self.dim)
+        #self.scale = torch.tensor(self.scale)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
     def forward(self, x):
@@ -75,7 +82,18 @@ class Attention(nn.Module):
         """
         B, N, C = x.shape
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-        pass
+        assert C == self.dim * self.num_heads
+        q = self.q(x).view(B,N,self.num_heads, self.dim).transpose(1,2)
+        k = self.k(x).view(B,N,self.num_heads, self.dim).transpose(1,2)
+        v = self.v(x).view(B,N,self.num_heads, self.dim).transpose(1,2)        
+        k_t = k.transpose(-1, -2)
+        attn_scores = torch.matmul(q, k_t) * self.scale # (B,H,N,N)
+        attn_weights = attn_scores.softmax(dim=-1)
+        attn = torch.matmul(attn_weights, v) # (B,H,N,D)
+        attn = attn.transpose(1, 2).contiguous().view(B, N, C)
+        
+        x = self.lin(attn)
+        attn = attn_weights
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
         return x, attn
 
@@ -104,8 +122,7 @@ class Block(nn.Module):
         self.mlp = Mlp(
             in_features=dim,
             hidden_features=mlp_hidden_dim,
-            act_layer=act_layer,
-            drop=drop,
+            act_layer=act_layer
         )
 
     def forward(self, x, return_attention=False):
@@ -163,9 +180,9 @@ class VisionTransformer(nn.Module):
         self.num_features = self.embed_dim = dim
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-        self.patch_embed = None
-        self.cls_token = None
-        self.pos_embed = None
+        self.patch_embed = PatchEmbed(image_size, patch_size, 3, self.embed_dim)
+        self.cls_token = nn.Parameter(torch.randn(size=(1, 1, self.embed_dim)), requires_grad=True)
+        self.pos_embed = nn.Parameter(torch.randn(size=(1, self.patch_embed.num_patches+1, self.embed_dim)), requires_grad=True)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
         assert pool in {
@@ -211,11 +228,14 @@ class VisionTransformer(nn.Module):
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
         # apply patch linear embedding
-        pass
+        x = self.patch_embed(x) # Returns (B, N, C) where N is the number of patches and C is the embedding dimension
+        
         # add the [CLS] token to the embed patch tokens
-        pass
+        temp = self.cls_token.expand(B, -1, -1)
+        x = torch.cat((temp, x), dim=1)
+        
         # add positional encoding to each token
-        pass
+        x += self.pos_embed
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
         return x
