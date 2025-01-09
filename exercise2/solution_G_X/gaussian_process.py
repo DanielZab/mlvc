@@ -43,12 +43,24 @@ def sample_points(mean, cov, n, observation=None):
     """
 
     # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-    if observation:
-        # conditioned on observation
-        sampled_points = None
+    if observation is not None:
+        # Split covariance into blocks
+        cov_11 = cov[1, 1]
+        cov_12 = cov[1, 0]
+        cov_22 = cov[0, 0]
+        mean_cond = mean[1] + cov_12 / cov_22 * (observation - mean[0])
+        var_cond = cov_11 - (cov_12**2) / cov_22
+
+        # Generate samples conditioned on the observed value of the first variable
+        sampled_x2 = np.random.normal(mean_cond, np.sqrt(var_cond), n)
+        sampled_x1 = np.full(n, observation)  # Fixed observation
     else:
-        # unconditioned
-        sampled_points = None
+        # Unconditioned case: Sample directly from the multivariate distribution
+        samples = np.random.multivariate_normal(mean, cov, n)
+        sampled_x1, sampled_x2 = samples[:, 0], samples[:, 1]
+
+    # Ensure output shape is (2, n)
+    sampled_points = np.vstack((sampled_x1, sampled_x2))
     # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
     return sampled_points
@@ -106,7 +118,30 @@ class GaussianProcess:
         length_scale, noise, periodicity = params
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-        pass
+
+        length_scale, noise, periodicity = params
+
+        if self.kernel_type == "RBF+Sine" or self.kernel_type == "Sine+RBF":
+            kernel = RBF(length_scale=length_scale) + ExpSineSquared(
+                length_scale=length_scale, periodicity=periodicity
+            )
+        elif self.kernel_type == "RBF":
+            kernel = RBF(length_scale=length_scale)
+        elif self.kernel_type == "Sine":
+            kernel = ExpSineSquared(
+                length_scale=length_scale, periodicity=periodicity
+            )
+
+        K = kernel(self.X_train) + noise * np.eye(len(self.X_train))
+        L = cholesky(K, lower=True)
+        alpha = cho_solve((L, True), self.y_train)
+
+        log_likelihood = (
+            -0.5 * np.dot(self.y_train, alpha)
+            - np.sum(np.log(np.diagonal(L)))
+            - len(self.X_train) / 2 * np.log(2 * np.pi)
+        )
+        return -log_likelihood
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
     def fit(self, X_train, y_train, meta_parameter_search=False):
@@ -127,8 +162,12 @@ class GaussianProcess:
             )
 
             # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-            self.negative_log_likelihood_type_2
-            self.length_scale, self.noise, self.periodicity = None, None, None
+            res = opt.minimize(
+                lambda params: self.negative_log_likelihood_type_2(params),
+                x0=[self.length_scale, self.noise, self.periodicity],
+                bounds=[(1e-2, 1e2), (1e-10, 1e-1), (1e-2, 1e2)],
+            )
+            self.length_scale, self.noise, self.periodicity = res.x
             # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
             print(
@@ -147,9 +186,9 @@ class GaussianProcess:
             )
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-        self.K = None
-        self.L_ = None
-        self.alpha_ = None
+        self.K = self.kernel(self.X_train) + self.noise * np.eye(len(self.X_train))
+        self.L_ = cholesky(self.K, lower=True)
+        self.alpha_ = cho_solve((self.L_, True), self.y_train)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
     def predict(self, X_test):
@@ -180,22 +219,22 @@ class GaussianProcess:
                 )
 
             # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-            mean_pred_distribution, std_pred_distribution, conv_pred_distribution = (
-                None,
-                None,
-                None,
-            )
+            y_mean_noisy = np.zeros(X_test.shape[0])
+            y_std_noisy = np.ones(X_test.shape[0])
+            y_cov_noisy = np.eye(X_test.shape[0])
             # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
             return y_mean_noisy, y_std_noisy, y_cov_noisy
 
         else:  # Predict based on GP posterior
             # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-            mean_pred_distribution, std_pred_distribution, conv_pred_distribution = (
-                None,
-                None,
-                None,
-            )
+            K_s = self.kernel(self.X_train, X_test)
+            K_ss = self.kernel(X_test) + self.noise * np.eye(len(X_test))
+            v = solve_triangular(self.L_, K_s, lower=True)
+
+            mean_pred_distribution = np.dot(v.T, self.alpha_)
+            std_pred_distribution = np.sqrt(np.diag(K_ss - np.dot(v.T, v)))
+            conv_pred_distribution = K_ss - np.dot(v.T, v)
             # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
             return mean_pred_distribution, std_pred_distribution, conv_pred_distribution
