@@ -64,7 +64,6 @@ class Attention(nn.Module):
         self.lin = nn.Linear(dim, dim)
         self.dim = dim // self.num_heads
         self.scale = qk_scale or 1. / math.sqrt(self.dim)
-        #self.scale = torch.tensor(self.scale)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
     def forward(self, x):
@@ -82,17 +81,26 @@ class Attention(nn.Module):
         """
         B, N, C = x.shape
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
+        # Calculate query, key and value and transpose to correct dimensions
         assert C == self.dim * self.num_heads
         q = self.q(x).view(B,N,self.num_heads, self.dim).transpose(1,2)
         k = self.k(x).view(B,N,self.num_heads, self.dim).transpose(1,2)
         v = self.v(x).view(B,N,self.num_heads, self.dim).transpose(1,2)        
         k_t = k.transpose(-1, -2)
-        attn_scores = torch.matmul(q, k_t) * self.scale # (B,H,N,N)
-        attn_weights = attn_scores.softmax(dim=-1)
-        attn = torch.matmul(attn_weights, v) # (B,H,N,D)
-        attn = attn.transpose(1, 2).contiguous().view(B, N, C)
         
+        # Get scaled attention scores 
+        attn_scores = torch.matmul(q, k_t) * self.scale # (B,H,N,N)
+        
+        # Apply softmax
+        attn_weights = attn_scores.softmax(dim=-1)
+        
+        # Multiply attention scores with values
+        attn = torch.matmul(attn_weights, v) # (B,H,N,D)
+        
+        # Convert to correct format and pass through a Linear layer
+        attn = attn.transpose(1, 2).contiguous().view(B, N, C)
         x = self.lin(attn)
+        
         attn = attn_weights
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
         return x, attn
@@ -180,7 +188,10 @@ class VisionTransformer(nn.Module):
         self.num_features = self.embed_dim = dim
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
+        # Apply patch embed, 3 because of RGB
         self.patch_embed = PatchEmbed(image_size, patch_size, 3, self.embed_dim)
+        
+        # Randomly initialize class token and positonal embedding
         self.cls_token = nn.Parameter(torch.randn(size=(1, 1, self.embed_dim)), requires_grad=True)
         self.pos_embed = nn.Parameter(torch.randn(size=(1, self.patch_embed.num_patches+1, self.embed_dim)), requires_grad=True)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
