@@ -44,22 +44,28 @@ def sample_points(mean, cov, n, observation=None):
 
     # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
     if observation is not None:
-        # Split covariance into blocks
-        cov_11 = cov[1, 1]
-        cov_12 = cov[1, 0]
-        cov_22 = cov[0, 0]
+        # Conditioned sampling
+        # Split covariance matrix into relevant components
+        cov_11 = cov[1, 1]  # Variance of the second variable
+        cov_12 = cov[1, 0]  # Covariance between the first and second variable
+        cov_22 = cov[0, 0]  # Variance of the first variable
+        
+        # Compute the conditional mean for the second variable
         mean_cond = mean[1] + cov_12 / cov_22 * (observation - mean[0])
+        # Compute the conditional variance for the second variable
         var_cond = cov_11 - (cov_12**2) / cov_22
 
-        # Generate samples conditioned on the observed value of the first variable
+        # Sample from the conditional distribution for the second variable
         sampled_x2 = np.random.normal(mean_cond, np.sqrt(var_cond), n)
-        sampled_x1 = np.full(n, observation)  # Fixed observation
+        # The first variable is fixed at the observed value
+        sampled_x1 = np.full(n, observation)
     else:
-        # Unconditioned case: Sample directly from the multivariate distribution
+        # Unconditioned sampling
+        # Directly sample from the multivariate normal distribution
         samples = np.random.multivariate_normal(mean, cov, n)
         sampled_x1, sampled_x2 = samples[:, 0], samples[:, 1]
 
-    # Ensure output shape is (2, n)
+    # Combine sampled variables into a single 2D array (2, n)
     sampled_points = np.vstack((sampled_x1, sampled_x2))
     # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
@@ -121,27 +127,28 @@ class GaussianProcess:
 
         length_scale, noise, periodicity = params
 
-        if self.kernel_type == "RBF+Sine" or self.kernel_type == "Sine+RBF":
-            kernel = RBF(length_scale=length_scale) + ExpSineSquared(
-                length_scale=length_scale, periodicity=periodicity
-            )
+        # Define the kernel based on the provided hyperparameters
+        if self.kernel_type in ["RBF+Sine", "Sine+RBF"]:
+            kernel = RBF(length_scale=length_scale) + ExpSineSquared(length_scale=length_scale, periodicity=periodicity)
         elif self.kernel_type == "RBF":
             kernel = RBF(length_scale=length_scale)
         elif self.kernel_type == "Sine":
-            kernel = ExpSineSquared(
-                length_scale=length_scale, periodicity=periodicity
-            )
+            kernel = ExpSineSquared(length_scale=length_scale, periodicity=periodicity)
 
+        # Compute the kernel matrix and add noise for numerical stability
         K = kernel(self.X_train) + noise * np.eye(len(self.X_train))
+        # Perform Cholesky decomposition for efficient matrix inversion
         L = cholesky(K, lower=True)
+        # Solve the linear system to compute alpha
         alpha = cho_solve((L, True), self.y_train)
 
+        # Compute the log likelihood using the standard Gaussian log likelihood formula
         log_likelihood = (
-            -0.5 * np.dot(self.y_train, alpha)
-            - np.sum(np.log(np.diagonal(L)))
-            - len(self.X_train) / 2 * np.log(2 * np.pi)
+            -0.5 * np.dot(self.y_train, alpha)  # Data fit term
+            - np.sum(np.log(np.diagonal(L)))    # Complexity penalty
+            - len(self.X_train) / 2 * np.log(2 * np.pi)  # Normalization term
         )
-        return -log_likelihood
+        return -log_likelihood  # Return the negative log likelihood (to minimize)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
     def fit(self, X_train, y_train, meta_parameter_search=False):
@@ -163,10 +170,11 @@ class GaussianProcess:
 
             # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
             res = opt.minimize(
-                lambda params: self.negative_log_likelihood_type_2(params),
+                self.negative_log_likelihood_type_2,
                 x0=[self.length_scale, self.noise, self.periodicity],
-                bounds=[(1e-2, 1e2), (1e-10, 1e-1), (1e-2, 1e2)],
+                bounds=[(1e-2, 1e2), (1e-10, 1e-1), (1e-2, 1e2)]
             )
+            # Update hyperparameters with the optimized values
             self.length_scale, self.noise, self.periodicity = res.x
             # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
@@ -186,8 +194,11 @@ class GaussianProcess:
             )
 
         # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
+        # Compute the kernel matrix and add noise
         self.K = self.kernel(self.X_train) + self.noise * np.eye(len(self.X_train))
+        # Perform Cholesky decomposition for efficient computations
         self.L_ = cholesky(self.K, lower=True)
+        # Solve for alpha (used in predictions)
         self.alpha_ = cho_solve((self.L_, True), self.y_train)
         # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
@@ -219,22 +230,23 @@ class GaussianProcess:
                 )
 
             # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-            y_mean_noisy = np.zeros(X_test.shape[0])
-            y_std_noisy = np.ones(X_test.shape[0])
-            y_cov_noisy = np.eye(X_test.shape[0])
+            y_mean_noisy = np.zeros(X_test.shape[0])  # Mean of the prior
+            y_std_noisy = np.ones(X_test.shape[0])    # Std. dev. of the prior
+            y_cov_noisy = np.eye(X_test.shape[0])     # Covariance of the prior
             # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
             return y_mean_noisy, y_std_noisy, y_cov_noisy
 
         else:  # Predict based on GP posterior
             # *****BEGINNING OF YOUR CODE (DO NOT DELETE THIS LINE)*****
-            K_s = self.kernel(self.X_train, X_test)
-            K_ss = self.kernel(X_test) + self.noise * np.eye(len(X_test))
-            v = solve_triangular(self.L_, K_s, lower=True)
+            # Posterior predictions
+            K_s = self.kernel(self.X_train, X_test) # Cross-covariance between train and test
+            K_ss = self.kernel(X_test) + self.noise * np.eye(len(X_test)) # Test covariance
+            v = solve_triangular(self.L_, K_s, lower=True) # Solve triangular system
 
-            mean_pred_distribution = np.dot(v.T, self.alpha_)
-            std_pred_distribution = np.sqrt(np.diag(K_ss - np.dot(v.T, v)))
-            conv_pred_distribution = K_ss - np.dot(v.T, v)
+            mean_pred_distribution = np.dot(v.T, self.alpha_) # Compute posterior mean
+            std_pred_distribution = np.sqrt(np.diag(K_ss - np.dot(v.T, v))) # Compute posterior variance
+            conv_pred_distribution = K_ss - np.dot(v.T, v) # Compute posterior covariance
             # *****END OF YOUR CODE (DO NOT DELETE THIS LINE)*****
 
             return mean_pred_distribution, std_pred_distribution, conv_pred_distribution
